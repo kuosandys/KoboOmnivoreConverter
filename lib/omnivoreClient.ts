@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import axios, { type AxiosResponse } from "axios";
 import {
   type Article,
@@ -6,8 +7,11 @@ import {
   type SearchSuccess,
 } from "../types/OmnivoreSchema";
 
+dotenv.config();
+
 const API_URL =
   process.env.OMNIVORE_API_URL ?? "https://api-prod.omnivore.app/api";
+const QUERY = process.env.OMNIVORE_FILTER ?? "in:inbox";
 
 export class OmnivoreClient { 
   username: string; 
@@ -103,7 +107,7 @@ export class OmnivoreClient {
                 }
               }
             }`,
-      variables: { query: "in:inbox", after: "0", first: 1000 },
+      variables: { query: QUERY, after: "0", first: 1000 },
     };
   
     const response: AxiosResponse<{ data: { search: SearchSuccess } }> =

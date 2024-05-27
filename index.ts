@@ -1,23 +1,26 @@
+import dotenv from "dotenv";
 import http from "http";
 import express, { type Request, type Response } from "express";
 import { type TypedRequestBody } from "./types/Express";
 import bodyParser from "body-parser";
-import { OmnivoreClient } from "./lib/omnivoreClient"
+import { OmnivoreClient } from "./lib/omnivoreClient";
 import {
   convertSearchResultsToPocketArticles,
   articleToPocketFormat,
 } from "./lib/pocketConverter";
 
-(async () => { 
+dotenv.config();
+
+(async () => {
   const proxyApp = express();
   let omnivoreClient: null | OmnivoreClient = null;
   const getOmnivoreClient = async (token: string) => {
-    if (!omnivoreClient) {  
+    if (!omnivoreClient) {
       omnivoreClient = await OmnivoreClient.createOmnivoreClient(token);
     }
 
     return omnivoreClient;
-  }
+  };
 
   proxyApp.use(bodyParser.json());
   proxyApp.use(bodyParser.urlencoded({ extended: true }));
@@ -43,13 +46,16 @@ import {
     }
   );
 
-  proxyApp.post("/v3/get", async (req: Request, res: Response): Promise<void> => {
-    const client = await getOmnivoreClient(req.body.access_token);
-    const articles = await client.fetchPages();
-    const converted = convertSearchResultsToPocketArticles(articles);
+  proxyApp.post(
+    "/v3/get",
+    async (req: Request, res: Response): Promise<void> => {
+      const client = await getOmnivoreClient(req.body.access_token);
+      const articles = await client.fetchPages();
+      const converted = convertSearchResultsToPocketArticles(articles);
 
-    res.send(converted);
-  });
+      res.send(converted);
+    }
+  );
 
   proxyApp.post(
     "/v3beta/text",
@@ -65,8 +71,8 @@ import {
   // Create a basic HTTP server
   const server = http.createServer(proxyApp);
 
-  // Start the server on port 8080
-  server.listen(80, () => {
-    console.log("Server running on port 5090");
+  const port = process.env.PORT ?? 80;
+  server.listen(port, () => {
+    console.log(`Server running on port ${port}`);
   });
 })();
