@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
-import http from "http";
-import express, { type Request, type Response } from "express";
+import express, { NextFunction, type Request, type Response } from "express";
 import { type TypedRequestBody } from "./types/Express";
-import bodyParser from "body-parser";
 import { OmnivoreClient } from "./lib/omnivoreClient";
 import {
   convertSearchResultsToPocketArticles,
@@ -11,22 +9,61 @@ import {
 
 dotenv.config();
 
-(async () => {
-  const proxyApp = express();
-  let omnivoreClient: null | OmnivoreClient = null;
-  const getOmnivoreClient = async (token: string) => {
-    if (!omnivoreClient) {
-      omnivoreClient = await OmnivoreClient.createOmnivoreClient(token);
-    }
+const proxyApp = express();
 
-    return omnivoreClient;
+let omnivoreClient: null | OmnivoreClient = null;
+const getOmnivoreClient = async (
+  token: string | undefined
+): Promise<OmnivoreClient> => {
+  if (!omnivoreClient) {
+    omnivoreClient = await OmnivoreClient.createOmnivoreClient(
+      token ?? process.env.FALLBACK_TOKEN!
+    );
+  }
+
+  return omnivoreClient;
+};
+
+const replaceContentType = (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  const contentType = req.headers["content-type"];
+  if (contentType && contentType.includes("charset=UTF8")) {
+    // wrong charset
+    req.headers["content-type"] = contentType.replace("UTF8", "UTF-8");
+  }
+  next();
+};
+
+const logErrors = (
+  err: Error,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) => {
+  console.error(err.stack);
+  res.status(500).send();
+};
+
+// deliberately ignoring errors from async operations (i.e. to Omnivore API), otherwise the whole sync operation fails
+const asyncWrapper =
+  (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+    return Promise.resolve(fn(req, res, next)).catch((err) => {
+      console.error(err.stack);
+      next(err);
+    });
   };
 
-  proxyApp.use(bodyParser.json());
-  proxyApp.use(bodyParser.urlencoded({ extended: true }));
+proxyApp.use(replaceContentType);
+proxyApp.use(express.json());
+proxyApp.use(express.urlencoded({ extended: true }));
+proxyApp.use(logErrors);
 
-  proxyApp.post(
-    "/v3/send",
+proxyApp.post(
+  "/v3/send",
+  asyncWrapper(
     async (
       req: TypedRequestBody<{
         actions: Array<{ action: string; item_id: string }>;
@@ -34,45 +71,46 @@ dotenv.config();
       }>,
       res: Response
     ): Promise<void> => {
-      const { actions, access_token } = req.body;
+      const { access_token, actions } = req.body;
+
       const client = await getOmnivoreClient(access_token);
 
       const archives = actions
         .filter((it) => it.action === "archive")
         .map((it) => it.item_id);
-      console.log(await Promise.all(archives.map(client.archiveLink, client)));
+      await Promise.all(archives.map(client.archiveLink, client));
 
       res.send({ action_results: [] });
     }
-  );
+  )
+);
 
-  proxyApp.post(
-    "/v3/get",
-    async (req: Request, res: Response): Promise<void> => {
-      const client = await getOmnivoreClient(req.body.access_token);
-      const articles = await client.fetchPages();
-      const converted = convertSearchResultsToPocketArticles(articles);
+proxyApp.post(
+  "/v3/get",
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { access_token } = req.body;
 
-      res.send(converted);
-    }
-  );
+    const client = await getOmnivoreClient(access_token);
+    const articles = await client.fetchPages();
+    const converted = convertSearchResultsToPocketArticles(articles);
 
-  proxyApp.post(
-    "/v3beta/text",
-    async (req: Request, res: Response): Promise<void> => {
-      const { url, access_token } = req.body;
-      const client = await getOmnivoreClient(access_token);
-      const article = await client.fetchPage(url);
+    res.send(converted);
+  })
+);
 
-      res.send(articleToPocketFormat(article));
-    }
-  );
+proxyApp.post(
+  "/v3beta/text",
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    const { access_token, url } = req.body;
 
-  // Create a basic HTTP server
-  const server = http.createServer(proxyApp);
+    const client = await getOmnivoreClient(access_token);
+    const article = await client.fetchPage(url);
 
-  const port = process.env.PORT ?? 80;
-  server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-})();
+    res.send(articleToPocketFormat(article));
+  })
+);
+
+const port = process.env.PORT ?? 80;
+proxyApp.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});

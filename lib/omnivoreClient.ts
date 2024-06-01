@@ -13,20 +13,20 @@ const API_URL =
   process.env.OMNIVORE_API_URL ?? "https://api-prod.omnivore.app/api";
 const QUERY = process.env.OMNIVORE_FILTER ?? "in:inbox";
 
-export class OmnivoreClient { 
-  username: string; 
+export class OmnivoreClient {
+  username: string;
   token: string;
 
-  private constructor(username: string, token: string) { 
+  private constructor(username: string, token: string) {
     this.username = username;
     this.token = token;
   }
 
-  static async createOmnivoreClient(token: string): Promise<OmnivoreClient> { 
+  static async createOmnivoreClient(token: string): Promise<OmnivoreClient> {
     return new OmnivoreClient(await this.getUsername(token), token);
   }
 
-  private static async getUsername(token: string): Promise<string> { 
+  private static async getUsername(token: string): Promise<string> {
     const data = JSON.stringify({
       query: `query GetUsername {
           me {
@@ -38,19 +38,17 @@ export class OmnivoreClient {
     `,
     });
 
-    const response =
-      await axios
-        .post(`${API_URL}/graphql`, data, {
-          headers: {
-            Cookie: `auth=${token};`,
-            "Content-Type": "application/json",
-          },
-        })
-        .catch((error) => {
-          console.error(error);
-          throw error;
-        });
-  
+    const response = await axios
+      .post(`${API_URL}/graphql`, data, {
+        headers: {
+          Cookie: `auth=${token};`,
+          "Content-Type": "application/json",
+        },
+      })
+      .catch((error) => {
+        throw error;
+      });
+
     return response.data.data.me.profile.username;
   }
 
@@ -109,7 +107,7 @@ export class OmnivoreClient {
             }`,
       variables: { query: QUERY, after: "0", first: 1000 },
     };
-  
+
     const response: AxiosResponse<{ data: { search: SearchSuccess } }> =
       await axios
         .post(`${API_URL}/graphql`, data, {
@@ -119,12 +117,11 @@ export class OmnivoreClient {
           },
         })
         .catch((error) => {
-          console.error(error);
           throw error;
         });
-  
+
     return response.data.data.search.edges;
-  };
+  }
 
   async fetchPage(slug: string): Promise<Article> {
     const data = JSON.stringify({
@@ -156,7 +153,7 @@ export class OmnivoreClient {
         }
     `,
     });
-  
+
     const response: AxiosResponse<{ data: { article: ArticleSuccess } }> =
       await axios.post(`${API_URL}/graphql`, data, {
         headers: {
@@ -164,10 +161,9 @@ export class OmnivoreClient {
           "Content-Type": "application/json",
         },
       });
-  
+
     return response.data.data.article.article;
-  };
-  
+  }
 
   async archiveLink(id: string): Promise<boolean> {
     const mutation = `mutation ArchivePage($id: ID!) {
@@ -195,5 +191,5 @@ export class OmnivoreClient {
         }
       )
       .then((_) => true);
-  };
+  }
 }

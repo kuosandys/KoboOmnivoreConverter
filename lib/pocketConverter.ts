@@ -107,6 +107,6 @@ export const convertSearchResultsToPocketArticles = (
       search_type: "normal",
     },
     error: null,
-    since: articles[0].node.savedAt,
+    since: articles[0] ? articles[0].node.savedAt : 0,
   };
 };
