@@ -75,10 +75,18 @@ proxyApp.post(
 
       const client = await getOmnivoreClient(access_token);
 
-      const archives = actions
+      const toArchive = actions
         .filter((it) => it.action === "archive")
         .map((it) => it.item_id);
-      await Promise.all(archives.map(client.archiveLink, client));
+
+      const toDelete = actions
+        .filter((it) => it.action === "delete")
+        .map((it) => it.item_id);
+
+      await Promise.all([
+        ...toArchive.map(client.archiveLink, client),
+        ...toDelete.map(client.deleteLink, client),
+      ]);
 
       res.send({ action_results: [] });
     }

@@ -192,4 +192,32 @@ export class OmnivoreClient {
       )
       .then((_) => true);
   }
+
+  async deleteLink(id: string): Promise<boolean> {
+    const mutation = `mutation SetBookmarkArticle($id: ID!) {
+    setBookmarkArticle(input: {articleID: $id, bookmark: false}) {
+      ... on SetBookmarkArticleSuccess {
+        bookmarkedArticle {
+          id
+        }
+      }
+      ... on SetBookmarkArticleError {
+        errorCodes
+      }
+    }
+  }`;
+
+    return await axios
+      .post(
+        `${API_URL}/graphql`,
+        { query: mutation, variables: { id } },
+        {
+          headers: {
+            Cookie: `auth=${this.token};`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      .then((_) => true);
+  }
 }
