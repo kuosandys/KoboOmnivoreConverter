@@ -118,7 +118,13 @@ proxyApp.post(
   })
 );
 
+proxyApp.get("/beep", async (_req: Request, res: Response): Promise<void> => {
+  res.status(200).send("boop");
+});
+
 const port = process.env.PORT ?? 80;
 proxyApp.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+export default proxyApp;
